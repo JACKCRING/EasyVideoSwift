@@ -82,7 +82,6 @@ public struct Video: View {
         Group {
             if let player = playback.player {
                 TransparentVideoSurface(player: player)
-                    .aspectRatio(contentMode: .fit)
             } else {
                 Text(playback.errorMessage ?? "无法加载视频")
                     .foregroundColor(.secondary)
