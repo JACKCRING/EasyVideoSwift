@@ -1,0 +1,12 @@
+# Swift Package Manager build artifacts and local workspace data
+.build/
+.swiftpm/
+
+# Xcode user-specific data and generated files
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# macOS Finder metadata
+.DS_Store

@@ -1,10 +1,9 @@
-#if canImport(SwiftUI) && canImport(AVKit)
 import SwiftUI
 @preconcurrency import AVKit
 
 /// 一个开箱即用的视频播放器。
 ///
-/// 视频文件可以放在宿主 App 的 Bundle 中，也可以放在本 Package 的 `Resources` 目录中。
+/// 视频文件需要加入宿主 App target，以便被打包到 App Bundle 中。
 ///
 ///     Video("intro.mp4")
 ///     Video("intro", loop: true)
@@ -216,7 +215,7 @@ private enum VideoResourceLocator {
             return fileURL
         }
 
-        let bundles = [Bundle.main, Bundle.module]
+        let bundles = [Bundle.main]
         let path = resourceName as NSString
         let extensionName = path.pathExtension
         let baseName = path.deletingPathExtension
@@ -242,23 +241,3 @@ private enum VideoResourceLocator {
         return nil
     }
 }
-#else
-/// 在不支持 SwiftUI 和 AVKit 的平台上保留 API，以便 Package 能够被解析。
-public struct Video: Sendable {
-    public enum PlaybackMode: Sendable {
-        case once
-        case loop
-        case pingPong
-    }
-
-    public init(
-        _ resourceName: String,
-        loop: Bool = false,
-        once: Bool = false,
-        pingPong: Bool = false,
-        autoplay: Bool = true
-    ) {}
-
-    public init(_ resourceName: String, mode: PlaybackMode, autoplay: Bool = true) {}
-}
-#endif
