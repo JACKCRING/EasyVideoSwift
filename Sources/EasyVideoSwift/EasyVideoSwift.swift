@@ -1,9 +1,16 @@
 import SwiftUI
-@preconcurrency import AVKit
+@preconcurrency import AVFoundation
+
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// 一个开箱即用的视频播放器。
 ///
 /// 视频文件需要加入宿主 App target，以便被打包到 App Bundle 中。
+/// 播放器容器与视频画面未覆盖的区域均保持透明，不会绘制默认底色。
 ///
 ///     Video("intro.mp4")
 ///     Video("intro", loop: true)
@@ -74,7 +81,7 @@ public struct Video: View {
     public var body: some View {
         Group {
             if let player = playback.player {
-                VideoPlayer(player: player)
+                TransparentVideoSurface(player: player)
                     .aspectRatio(contentMode: .fit)
             } else {
                 Text(playback.errorMessage ?? "无法加载视频")
@@ -209,32 +216,117 @@ private final class VideoPlaybackController: ObservableObject {
     }
 }
 
+#if os(macOS)
+private struct TransparentVideoSurface: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> TransparentPlayerView {
+        TransparentPlayerView(player: player)
+    }
+
+    func updateNSView(_ nsView: TransparentPlayerView, context: Context) {
+        nsView.player = player
+    }
+}
+
+private final class TransparentPlayerView: NSView {
+    var player: AVPlayer? {
+        didSet {
+            playerLayer.player = player
+        }
+    }
+
+    private var playerLayer: AVPlayerLayer {
+        guard let playerLayer = layer as? AVPlayerLayer else {
+            fatalError("TransparentPlayerView 的 layer 必须是 AVPlayerLayer")
+        }
+        return playerLayer
+    }
+
+    init(player: AVPlayer) {
+        self.player = player
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer = AVPlayerLayer()
+        layer?.backgroundColor = NSColor.clear.cgColor
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.player = player
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+}
+#else
+private struct TransparentVideoSurface: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> TransparentPlayerView {
+        TransparentPlayerView(player: player)
+    }
+
+    func updateUIView(_ uiView: TransparentPlayerView, context: Context) {
+        uiView.player = player
+    }
+}
+
+private final class TransparentPlayerView: UIView {
+    override class var layerClass: AnyClass {
+        AVPlayerLayer.self
+    }
+
+    var player: AVPlayer? {
+        didSet {
+            playerLayer.player = player
+        }
+    }
+
+    private var playerLayer: AVPlayerLayer {
+        guard let playerLayer = layer as? AVPlayerLayer else {
+            fatalError("TransparentPlayerView 的 layer 必须是 AVPlayerLayer")
+        }
+        return playerLayer
+    }
+
+    init(player: AVPlayer) {
+        self.player = player
+        super.init(frame: .zero)
+        backgroundColor = .clear
+        isOpaque = false
+        playerLayer.backgroundColor = UIColor.clear.cgColor
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.player = player
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+}
+#endif
+
 private enum VideoResourceLocator {
     static func url(for resourceName: String) -> URL? {
         if let fileURL = URL(string: resourceName), fileURL.isFileURL {
             return fileURL
         }
 
-        let bundles = [Bundle.main]
         let path = resourceName as NSString
         let extensionName = path.pathExtension
         let baseName = path.deletingPathExtension
 
-        for bundle in bundles {
-            if !extensionName.isEmpty,
-               let url = bundle.url(forResource: baseName, withExtension: extensionName) {
-                return url
-            }
+        if !extensionName.isEmpty,
+           let url = Bundle.main.url(forResource: baseName, withExtension: extensionName) {
+            return url
+        }
 
-            if extensionName.isEmpty,
-               let url = bundle.url(forResource: resourceName, withExtension: nil) {
-                return url
-            }
+        if extensionName.isEmpty,
+           let url = Bundle.main.url(forResource: resourceName, withExtension: nil) {
+            return url
+        }
 
-            for candidateExtension in ["mp4", "mov", "m4v"] {
-                if let url = bundle.url(forResource: resourceName, withExtension: candidateExtension) {
-                    return url
-                }
+        for candidateExtension in ["mp4", "mov", "m4v"] {
+            if let url = Bundle.main.url(forResource: resourceName, withExtension: candidateExtension) {
+                return url
             }
         }
 
